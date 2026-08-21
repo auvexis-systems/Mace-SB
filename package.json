@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "render:init": "npm run db:push && npm run db:seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
