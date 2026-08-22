@@ -1,4 +1,5 @@
 import { Trophy, Crown, Dices, Layers, Disc, Sparkles, Award, Gem, Target, type LucideIcon } from "lucide-react";
+import type { Prisma } from "@/generated/prisma";
 
 export type MediaCategory =
   | "slots"
@@ -72,3 +73,18 @@ export const SYSTEM_MEDIA_MOTIFS: {
 export function mediaIconFor(key: string | null | undefined): LucideIcon {
   return MEDIA_ICON_REGISTRY[(key as MediaIconKey) || "trophy"] || Trophy;
 }
+
+// The gallery (MediaLibrary/AssetTile) only ever renders these fields — a
+// Prisma select trims columns like `tags`/`assetType`/`uploadedBy` off the
+// query result instead of fetching and then discarding them in JS. Shared
+// across every page that loads the gallery so the shape always matches
+// MediaAssetItem in media-library.tsx.
+export const MEDIA_ASSET_GALLERY_SELECT = {
+  id: true,
+  name: true,
+  category: true,
+  fileUrl: true,
+  iconKey: true,
+  accent: true,
+  isSystemAsset: true,
+} satisfies Prisma.MediaAssetSelect;

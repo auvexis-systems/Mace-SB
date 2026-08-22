@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { CardForm, type CardFormValues } from "@/components/admin/card-form";
 import { parseTags } from "@/lib/data";
 import { DEFAULT_CARD_STYLE } from "@/lib/card-styles";
+import { MEDIA_ASSET_GALLERY_SELECT } from "@/lib/media";
 
 export const metadata = { title: "Angebot bearbeiten" };
 
@@ -11,7 +12,10 @@ export default async function EditCardPage({ params }: { params: Promise<{ id: s
   const [card, categories, mediaAssets] = await Promise.all([
     prisma.card.findUnique({ where: { id } }),
     prisma.category.findMany({ orderBy: { position: "asc" } }),
-    prisma.mediaAsset.findMany({ orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }] }),
+    prisma.mediaAsset.findMany({
+      orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }],
+      select: MEDIA_ASSET_GALLERY_SELECT,
+    }),
   ]);
 
   if (!card) notFound();
@@ -53,15 +57,7 @@ export default async function EditCardPage({ params }: { params: Promise<{ id: s
       <CardForm
         initial={initial}
         categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-        mediaAssets={mediaAssets.map((a) => ({
-          id: a.id,
-          name: a.name,
-          category: a.category,
-          fileUrl: a.fileUrl,
-          iconKey: a.iconKey,
-          accent: a.accent,
-          isSystemAsset: a.isSystemAsset,
-        }))}
+        mediaAssets={mediaAssets}
       />
     </div>
   );

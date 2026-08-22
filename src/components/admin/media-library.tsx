@@ -24,6 +24,11 @@ export type SelectedMedia = { imageUrl: string | null; mediaIconKey: string | nu
 const accentVar = (accent: string) =>
   accent === "accent2" ? "var(--msb-accent-2)" : accent === "featured" ? "var(--msb-featured)" : "var(--msb-accent)";
 
+// Matches the gallery grid's actual column counts (grid-cols-2 / sm:3 / md:4)
+// so the browser requests an image close to its real rendered size instead
+// of defaulting to a full-viewport-width guess for `fill` images.
+const GALLERY_IMAGE_SIZES = "(min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw";
+
 function AssetTile({
   asset,
   onSelect,
@@ -34,12 +39,23 @@ function AssetTile({
   onDelete?: (id: string) => void;
 }) {
   const color = accentVar(asset.accent);
+  const [loaded, setLoaded] = useState(false);
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5">
       <div className="relative flex aspect-[4/3] items-center justify-center bg-black/30">
         {asset.fileUrl ? (
-          <Image src={asset.fileUrl} alt={asset.name} fill className="object-cover" />
+          <>
+            {!loaded && <div className="absolute inset-0 animate-pulse bg-white/10" />}
+            <Image
+              src={asset.fileUrl}
+              alt={asset.name}
+              fill
+              sizes={GALLERY_IMAGE_SIZES}
+              className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+              onLoad={() => setLoaded(true)}
+            />
+          </>
         ) : (
           <MediaMotifIcon iconKey={asset.iconKey} className="h-10 w-10" style={{ color, filter: `drop-shadow(0 0 12px ${color})` }} />
         )}

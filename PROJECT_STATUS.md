@@ -1,6 +1,6 @@
 # MaceSlotsBonus — Projektstatus
 
-Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS, Media Pack v1.0 Import, Render-Auto-Init)
+Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS, Media Pack v1.0 Import, Render-Auto-Init, Medienbibliothek-Performance)
 
 ## Stabile Online-Baseline (Tag `mace-v1.3-online-baseline`)
 
@@ -1072,3 +1072,121 @@ nächsten Neustart erneut gefehlt.
   — keine neue Testlogik nötig (reine Skript-/Konfigurationsänderung ohne
   neue Verzweigungen in der Anwendung selbst); stattdessen End-to-End per
   echtem Kommando-Lauf verifiziert (siehe oben).
+
+---
+
+# Medienbibliothek-Performance
+
+Gezielter Performance-Pass auf `/admin/media` und die Galerie-Ansicht im
+Card-Editor/-Wizard, nachdem die Bibliothek mit dem Asset Pack v1.0 auf 39
+Einträge gewachsen ist. Keine Funktionalität entfernt, keine bestehende
+Datenstruktur verändert — reine Rendering- und Abfrage-Optimierung.
+
+## Analyse (Ausgangsbefund)
+
+- Alle Asset-Karten laufen über eine einzige Komponente,
+  `AssetTile` in `media-library.tsx`, gerendert von `MediaLibrary` (Verwaltung
+  unter „Medien") und wiederverwendet in `ImagePicker` (Galerie-Tab im
+  Card-Editor/-Wizard) — eine Änderung wirkt sich also automatisch auf alle
+  drei Oberflächen aus.
+- Bilder liefen bereits über `next/image` (`<Image fill .../>`), nicht über
+  rohe `<img>`-Tags — Next.js' eingebautes Lazy-Loading (IntersectionObserver,
+  Standardverhalten ohne `priority`-Flag) war also technisch schon aktiv.
+- Zwei reale Lücken gefunden: kein `sizes`-Attribut auf den `fill`-Bildern
+  (Next.js geht bei `fill` ohne `sizes` von voller Viewportbreite aus und
+  liefert dadurch unnötig große Bildvarianten für eine Galerie-Kachel), und
+  kein Ladezustand (Bild poppt abrupt in eine schwarze Kachel hinein statt
+  sanft einzublenden).
+- Die drei Server-Komponenten, die Galerie-Daten laden (`/admin/media`,
+  `/admin/cards/new`, `/admin/cards/[id]`), fragten mit
+  `prisma.mediaAsset.findMany()` **alle** Spalten ab (inkl. `tags`,
+  `assetType`, `source`, `uploadedBy`) und reduzierten das Ergebnis erst
+  danach in JavaScript auf die sieben tatsächlich benötigten Felder — die
+  ungenutzten Spalten wurden also unnötig aus der Datenbank geladen und ins
+  RSC-Payload serialisiert.
+
+## Priorität 1 — umgesetzt
+
+- **`sizes`-Attribut ergänzt** (`media-library.tsx`): passend zum
+  tatsächlichen Grid (`grid-cols-2` / `sm:grid-cols-3` / `md:grid-cols-4`) als
+  `"(min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"`. Next.js liefert
+  dadurch eine zur Kachelgröße passende Bildvariante statt einer
+  Viewport-großen. Gemessen an einem Beispiel-Asset: Originaldatei 1,1 MB →
+  vom Next.js-Bildoptimierer ausgelieferte Variante bei 384px/q75 nur
+  **51 KB (−95,5 %)**, danach `X-Nextjs-Cache: HIT` bei Folgeanfragen.
+- **Next.js Image war bereits im Einsatz** (kein `<img>` zu ersetzen) —
+  Lazy Loading damit bereits nativ aktiv, keine zusätzliche Bibliothek nötig.
+- **Kein Layout-Shift**: Der Bildbereich jeder Kachel steht bereits über
+  `relative` + `aspect-[4/3]` fest, unabhängig vom Ladezustand des Bildes —
+  das war schon vor diesem Pass korrekt und wurde nicht verändert.
+
+## Priorität 2 — umgesetzt
+
+- **Skeleton-Platzhalter statt leerer schwarzer Kachel**: `AssetTile` zeigt
+  jetzt einen pulsierenden Platzhalter (`animate-pulse`), solange das Bild
+  lädt, und blendet das Bild per `onLoad`-Callback sanft ein
+  (`opacity-0 → opacity-100`, 300 ms Übergang). Icon-Fallback-Kacheln (Motive
+  ohne eigenes Bild) sind davon nicht betroffen, da sie ohnehin sofort ohne
+  Netzwerk-Request rendern.
+
+## Priorität 3 — umgesetzt
+
+- **Prisma-`select` ergänzt**: neue geteilte Konstante
+  `MEDIA_ASSET_GALLERY_SELECT` in `src/lib/media.ts` (typisiert gegen
+  `Prisma.MediaAssetSelect`), verwendet in allen drei Ladestellen
+  (`/admin/media`, `/admin/cards/new`, `/admin/cards/[id]`). Lädt nur noch
+  `id, name, category, fileUrl, iconKey, accent, isSystemAsset` — exakt die
+  Felder, die `MediaAssetItem` in der Galerie tatsächlich braucht. Die
+  vorherige manuelle Nachbearbeitung per `.map()` auf denselben sieben
+  Feldern entfiel dadurch als Nebeneffekt (Prisma liefert mit `select`
+  bereits die passende Form).
+
+## Bewertung: Thumbnail-Strategie vs. Next.js-Bildoptimierung (nur bewertet, nicht implementiert)
+
+Wie angefordert nur geprüft, keine Thumbnail-Generierung gebaut:
+
+- Next.js' eingebauter Bildoptimierer verhält sich beim aktuellen Umfang
+  bereits **wie eine automatische Thumbnail-Pipeline**: Er skaliert und
+  komprimiert jedes Bild bedarfsgerecht auf die tatsächlich angeforderte
+  Zielgröße (siehe Messung oben, −95,5 % bei einer Beispielkachel) und
+  cached das Ergebnis serverseitig (`X-Nextjs-Cache: HIT` ab der zweiten
+  Anfrage) — ganz ohne eigene Pipeline, eigenen Datenbank-Zustand oder
+  zusätzlichen Build-Schritt.
+- Eine **eigene Thumbnail-Generierung** (z. B. beim Upload/Import zusätzlich
+  ein kleines Vorschaubild erzeugen und referenzieren) würde zusätzliche
+  Komplexität bedeuten: neues Datenbankfeld, neuer Verarbeitungsschritt im
+  Upload- und Import-Pfad, zusätzliche Dateien zu pflegen — genau die Art
+  Änderung, die laut Auftrag vermieden werden sollte („keine Änderung am
+  Upload-/Import-System").
+- **Empfehlung:** Für den aktuellen und mittelfristig absehbaren Umfang
+  (aktuell 39 Assets, auch bei einigen hundert unproblematisch, da Lazy
+  Loading ohnehin nur sichtbare Kacheln lädt) ist die vorhandene
+  Next.js-Bildoptimierung ausreichend — eine eigene Thumbnail-Pipeline würde
+  hier nur zusätzliche Komplexität ohne spürbaren Zusatznutzen bedeuten. Erst
+  bei sehr großen Stückzahlen (viele hundert bis tausende Assets) oder bei
+  deutlich höherauflösenden Rohbildern als aktuell (>1024px-Motive, >5 MB)
+  wäre eine dedizierte Vorschaubild-Erzeugung beim Upload/Import erneut zu
+  bewerten.
+
+## Nicht verändert (wie gefordert)
+
+- Keine Änderung an `MediaAsset`-Datenbankschema, keine Migration.
+- Keine Änderung am Upload-System (`storage.ts`, `uploadMediaAction`,
+  `UploadZone`).
+- Keine Änderung am Import-System (`prisma/import-media-pack.ts`).
+- Keine Änderung an Render-Deployment/-Konfiguration.
+- Keine Funktionalität entfernt: Kategorie-Filter, Löschen, Upload, Auswahl
+  im Editor/Wizard funktionieren unverändert.
+
+## Qualitätssicherung
+
+- `npm run lint` ✓, `npm run typecheck` ✓ (inkl. `satisfies
+  Prisma.MediaAssetSelect`-Typprüfung), `npm run test` ✓ **54/54**, `npm run
+  build` ✓ — alle vier ohne Änderungen an bestehenden Tests, da reine
+  Darstellungs-/Abfrage-Optimierung ohne neue fachliche Logik.
+- Browser-Check gegen den Production-Build: `/admin/media` zeigt weiterhin
+  alle **39 Assets** korrekt inkl. aller Filter-Kacheln (Alle, Slots, Karten,
+  Chips, Würfel, VIP, Jackpot, Hintergründe, UI-Elemente, Sonstiges), keine
+  Konsolenfehler. Card-Wizard → Schritt „Bild": Galerie zeigt ebenfalls alle
+  39 Einträge, „Verwenden" auf ein Motiv geklickt → Bestätigungstext „Motiv
+  aus der Galerie ausgewählt." erscheint, Auswahl funktioniert unverändert.

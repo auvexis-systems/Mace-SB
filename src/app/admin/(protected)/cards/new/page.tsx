@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { CardWizard } from "@/components/admin/card-wizard";
+import { MEDIA_ASSET_GALLERY_SELECT } from "@/lib/media";
 
 export const metadata = { title: "Neues Angebot" };
 
 export default async function NewCardPage() {
   const [categories, mediaAssets] = await Promise.all([
     prisma.category.findMany({ orderBy: { position: "asc" } }),
-    prisma.mediaAsset.findMany({ orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }] }),
+    prisma.mediaAsset.findMany({
+      orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }],
+      select: MEDIA_ASSET_GALLERY_SELECT,
+    }),
   ]);
 
   return (
@@ -17,15 +21,7 @@ export default async function NewCardPage() {
       </div>
       <CardWizard
         categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-        mediaAssets={mediaAssets.map((a) => ({
-          id: a.id,
-          name: a.name,
-          category: a.category,
-          fileUrl: a.fileUrl,
-          iconKey: a.iconKey,
-          accent: a.accent,
-          isSystemAsset: a.isSystemAsset,
-        }))}
+        mediaAssets={mediaAssets}
       />
     </div>
   );
