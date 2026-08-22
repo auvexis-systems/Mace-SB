@@ -43,6 +43,9 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 
+# local pre-change database backups (see prisma/import-media-pack.ts)
+/prisma/backups/
+
 # generated prisma client
 /src/generated
 
@@ -52,6 +55,10 @@ yarn-error.log*
 
 # generated admin credentials
 ADMIN_CREDENTIALS.txt
+
+# raw source for one-time asset imports (see prisma/import-media-pack.ts) —
+# only the copied, deployed output in /public/media-pack is tracked
+/assets/
 
 # typescript
 *.tsbuildinfo

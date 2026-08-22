@@ -1,6 +1,6 @@
 # MaceSlotsBonus — Projektstatus
 
-Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS)
+Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS, Media Pack v1.0 Import)
 
 ## Stabile Online-Baseline (Tag `mace-v1.3-online-baseline`)
 
@@ -960,3 +960,50 @@ festgestellt.
   Stand liegt nur lokal committet vor, noch nicht auf `master` gepusht bzw.
   nicht auf Render deployt (siehe Abschlussbericht im Chat für die
   Freigabe-Rückfrage).
+
+---
+
+# Media Pack v1.0 — Bulk-Import in die Medienbibliothek
+
+Einmaliger, wiederholbar sicherer Import des fertigen Asset Packs
+(`assets/MaceSlotsBonus_AssetPack_v1.0/`, 30 PNGs: 4 Hintergründe, 12
+Card-Motive dunkel, 12 Card-Motive freigestellt/transparent, 2 UI-Icons) in
+die bestehende `MediaAsset`-Tabelle, per neuem Skript
+`prisma/import-media-pack.ts` (`npm run import:media-pack`).
+
+- **Additiv:** Datenbankschema um zwei nullable Felder erweitert
+  (`assetType`, `tags` auf `MediaAsset`), per `prisma db push` non-destruktiv
+  angewendet — keine bestehende Spalte, Zeile oder Tabelle verändert.
+- **Keine Duplikate:** Vor jedem Insert prüft das Skript, ob bereits ein
+  `MediaAsset` mit demselben Ziel-Dateipfad existiert; ein zweiter Lauf
+  überspringt alle 30 Dateien (getestet, 0 neu / 30 übersprungen).
+- **Kategorien aus Ordnerstruktur + Dateiname:** `01_Backgrounds` →
+  Kategorie „Hintergründe", `04_UI_Assets` → „UI-Elemente" (beide additiv als
+  neue Filter-Kacheln in `src/lib/media.ts` ergänzt); Card-Motive aus
+  `02_Card_Motifs_Dark`/`03_Card_Motifs_Transparent` werden zusätzlich anhand
+  des Dateinamens kategorisiert (z. B. `card_vip_crown_01.png` → VIP,
+  `card_slot_neon777_01.png` → Slots), alle als Typ „Card Motif".
+- **Metadaten:** Name, Kategorie, Tags (kommagetrennt) und Asset-Typ stammen
+  aus einer Zuordnungstabelle im Importskript, die die Beschreibungen aus
+  dem README des Asset Packs übernimmt (z. B. „VIP Club & Loyalty Rewards"
+  statt des rohen Dateinamens); der Dateipfad wird als `fileUrl`
+  gespeichert.
+- **Kein Eingriff ins bestehende Upload-System:** `saveUploadedImage`,
+  `uploadMediaAction` und die Upload-Zone in der Medienbibliothek wurden
+  nicht verändert — der Import läuft komplett getrennt über Node/Prisma
+  direkt, die Dateien werden nach `public/media-pack/…` kopiert (nicht nach
+  `public/uploads/`, das weiterhin ausschließlich für Operator-Uploads
+  reserviert bleibt).
+- **Vorher geprüft:** Alle 30 Quelldateien per PNG-Signaturprüfung
+  validiert (das Importskript bricht bei einer ungültigen Datei komplett ab,
+  bevor irgendetwas kopiert oder in die Datenbank geschrieben wird); vor dem
+  Schema-Push wurde `prisma/dev.db` nach `prisma/backups/` gesichert
+  (lokal, git-ignoriert).
+- **Ergebnis nach Import:** 39 `MediaAsset`-Zeilen insgesamt (9 bestehende
+  kuratierte System-Motive unverändert + 30 neu importiert), sichtbar unter
+  „Medien" im Adminbereich inklusive der beiden neuen Filter-Kacheln; per
+  Browser-Test (Production-Build) bestätigt, keine Konsolenfehler.
+- **Tests:** 3 neue Tests in `src/tests/media-import.test.ts` (Speichern von
+  `assetType`/`tags`, Duplikat-Erkennung über `fileUrl`, bestehende Zeilen
+  bleiben beim Einfügen neuer Assets unverändert) — Gesamt **54/54 Tests
+  grün**.

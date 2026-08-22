@@ -1,6 +1,15 @@
 import { Trophy, Crown, Dices, Layers, Disc, Sparkles, Award, Gem, Target, type LucideIcon } from "lucide-react";
 
-export type MediaCategory = "slots" | "karten" | "chips" | "wuerfel" | "vip" | "jackpot" | "sonstiges";
+export type MediaCategory =
+  | "slots"
+  | "karten"
+  | "chips"
+  | "wuerfel"
+  | "vip"
+  | "jackpot"
+  | "sonstiges"
+  | "backgrounds"
+  | "ui";
 
 export const MEDIA_CATEGORIES: { key: MediaCategory | "alle"; label: string }[] = [
   { key: "alle", label: "Alle" },
@@ -10,6 +19,8 @@ export const MEDIA_CATEGORIES: { key: MediaCategory | "alle"; label: string }[] 
   { key: "wuerfel", label: "Würfel" },
   { key: "vip", label: "VIP" },
   { key: "jackpot", label: "Jackpot" },
+  { key: "backgrounds", label: "Hintergründe" },
+  { key: "ui", label: "UI-Elemente" },
   { key: "sonstiges", label: "Sonstiges" },
 ];
 

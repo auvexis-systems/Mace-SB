@@ -144,9 +144,11 @@ model MediaAsset {
   fileUrl        String? // set for uploaded images
   iconKey        String? // set for built-in system motifs (no file on disk)
   accent         String   @default("accent") // accent | accent2 | featured
-  source         String   @default("system") // "system" | "upload"
+  source         String   @default("system") // "system" | "upload" | "import"
   isSystemAsset  Boolean  @default(false)
   uploadedBy     String?
+  assetType      String? // "background" | "card-motif" | "ui-icon" | ... (free-form, set by bulk imports)
+  tags           String? // comma-separated free-form tags, set by bulk imports
   createdAt      DateTime @default(now())
 
   @@index([category])
