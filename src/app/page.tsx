@@ -33,6 +33,8 @@ export default async function HomePage() {
     longDesc: c.longDesc,
     imageUrl: c.imageUrl,
     imageAlt: c.imageAlt,
+    mediaIconKey: c.mediaIconKey,
+    stylePreset: c.stylePreset,
     badge: c.badge,
     promoCode: c.promoCode,
     oldPrice: c.oldPrice,

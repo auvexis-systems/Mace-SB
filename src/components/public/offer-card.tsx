@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { ExternalLink, Clock, MousePointerClick, Trophy, Star, Dices, Crown, type LucideIcon } from "lucide-react";
 import { CopyCodeButton } from "./copy-code-button";
+import { getCardStyle } from "@/lib/card-styles";
+import { MediaMotifIcon } from "./media-icon";
 
 export type PublicCardData = {
   id: string;
@@ -9,6 +11,8 @@ export type PublicCardData = {
   longDesc: string | null;
   imageUrl: string | null;
   imageAlt: string | null;
+  mediaIconKey: string | null;
+  stylePreset: string | null;
   badge: string | null;
   promoCode: string | null;
   oldPrice: string | null;
@@ -43,6 +47,22 @@ const ACCENTS: Accent[] = [
   { icon: Crown, colorVar: "--msb-featured" },
 ];
 
+/** Renders the chosen media motif, or the position-based fallback icon if none was set. */
+function BannerIcon({
+  mediaIconKey,
+  fallback: Fallback,
+  className,
+  style,
+}: {
+  mediaIconKey: string | null;
+  fallback: LucideIcon;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  if (mediaIconKey) return <MediaMotifIcon iconKey={mediaIconKey} className={className} style={style} />;
+  return <Fallback className={className} style={style} aria-hidden="true" />;
+}
+
 export function OfferCard({
   card,
   showClicks,
@@ -52,9 +72,8 @@ export function OfferCard({
   showClicks: boolean;
   accentIndex?: number;
 }) {
-  const accent = ACCENTS[accentIndex % ACCENTS.length];
-  const accentColor = `var(${accent.colorVar})`;
-  const Icon = accent.icon;
+  const positionAccent = ACCENTS[accentIndex % ACCENTS.length];
+  const accentColor = card.stylePreset ? getCardStyle(card.stylePreset).accent : `var(${positionAccent.colorVar})`;
 
   return (
     <article
@@ -84,7 +103,12 @@ export function OfferCard({
             style={{ background: `radial-gradient(circle at 50% 35%, color-mix(in srgb, ${accentColor} 35%, transparent), transparent 70%)` }}
             aria-hidden="true"
           >
-            <Icon className="msb-card-banner-icon" style={{ color: accentColor, filter: `drop-shadow(0 0 22px ${accentColor})` }} />
+            <BannerIcon
+              mediaIconKey={card.mediaIconKey}
+              fallback={positionAccent.icon}
+              className="msb-card-banner-icon"
+              style={{ color: accentColor, filter: `drop-shadow(0 0 22px ${accentColor})` }}
+            />
           </div>
         )}
         {card.badge && (

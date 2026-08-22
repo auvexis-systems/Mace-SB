@@ -102,7 +102,7 @@ export function CategoriesManager({ categories: initialCategories }: { categorie
       </form>
 
       <div className="flex flex-col gap-2">
-        {categories.length === 0 && <p className="text-sm text-white/40">Noch keine Kategorien.</p>}
+        {categories.length === 0 && <p className="text-sm text-white/40">Noch keine Kategorie erstellt.</p>}
         {categories.map((cat, index) =>
           editingId === cat.id ? (
             <EditRow key={cat.id} category={cat} onCancel={() => setEditingId(null)} />

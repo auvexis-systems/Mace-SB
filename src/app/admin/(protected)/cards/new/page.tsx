@@ -1,18 +1,32 @@
 import { prisma } from "@/lib/prisma";
-import { CardForm } from "@/components/admin/card-form";
+import { CardWizard } from "@/components/admin/card-wizard";
 
-export const metadata = { title: "Neue Card" };
+export const metadata = { title: "Neues Angebot" };
 
 export default async function NewCardPage() {
-  const categories = await prisma.category.findMany({ orderBy: { position: "asc" } });
+  const [categories, mediaAssets] = await Promise.all([
+    prisma.category.findMany({ orderBy: { position: "asc" } }),
+    prisma.mediaAsset.findMany({ orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }] }),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Neue Card</h1>
-        <p className="text-sm text-white/50">Erstellen Sie ein neues Angebot.</p>
+        <h1 className="text-2xl font-bold">Neues Angebot</h1>
+        <p className="text-sm text-white/50">In wenigen Schritten zu deinem neuen Angebot.</p>
       </div>
-      <CardForm categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
+      <CardWizard
+        categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        mediaAssets={mediaAssets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          category: a.category,
+          fileUrl: a.fileUrl,
+          iconKey: a.iconKey,
+          accent: a.accent,
+          isSystemAsset: a.isSystemAsset,
+        }))}
+      />
     </div>
   );
 }

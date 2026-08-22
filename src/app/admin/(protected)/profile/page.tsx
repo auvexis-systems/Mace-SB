@@ -15,19 +15,29 @@ export default async function ProfilePage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold">Profil</h1>
-        <p className="text-sm text-white/50">Marke, Social Links, SEO und rechtliche Texte.</p>
+        <p className="text-sm text-white/50">So stellst du dich und deine Kanäle vor.</p>
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Social Links</h2>
-        <SocialLinksManager
-          links={socialLinks.map((l) => ({ id: l.id, platform: l.platform, url: l.url, active: l.active }))}
+        <h2 className="mb-3 text-lg font-semibold">Marke</h2>
+        <ProfileForm
+          profile={{
+            brandName: profile.brandName,
+            description: profile.description,
+            noticeText: profile.noticeText,
+            avatarUrl: profile.avatarUrl,
+            shareEnabled: profile.shareEnabled,
+            publicClicksVisible: profile.publicClicksVisible,
+            searchEnabled: profile.searchEnabled,
+          }}
         />
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Profil, SEO &amp; Rechtliches</h2>
-        <ProfileForm profile={profile} />
+        <h2 className="mb-3 text-lg font-semibold">Social Media</h2>
+        <SocialLinksManager
+          links={socialLinks.map((l) => ({ id: l.id, platform: l.platform, url: l.url, active: l.active }))}
+        />
       </section>
     </div>
   );

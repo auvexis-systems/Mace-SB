@@ -2,14 +2,16 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { CardForm, type CardFormValues } from "@/components/admin/card-form";
 import { parseTags } from "@/lib/data";
+import { DEFAULT_CARD_STYLE } from "@/lib/card-styles";
 
-export const metadata = { title: "Card bearbeiten" };
+export const metadata = { title: "Angebot bearbeiten" };
 
 export default async function EditCardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [card, categories] = await Promise.all([
+  const [card, categories, mediaAssets] = await Promise.all([
     prisma.card.findUnique({ where: { id } }),
     prisma.category.findMany({ orderBy: { position: "asc" } }),
+    prisma.mediaAsset.findMany({ orderBy: [{ isSystemAsset: "desc" }, { createdAt: "desc" }] }),
   ]);
 
   if (!card) notFound();
@@ -21,6 +23,8 @@ export default async function EditCardPage({ params }: { params: Promise<{ id: s
     longDesc: card.longDesc || "",
     imageUrl: card.imageUrl,
     imageAlt: card.imageAlt || "",
+    mediaIconKey: card.mediaIconKey,
+    stylePreset: card.stylePreset || DEFAULT_CARD_STYLE,
     badge: card.badge || "",
     promoCode: card.promoCode || "",
     oldPrice: card.oldPrice || "",
@@ -43,10 +47,22 @@ export default async function EditCardPage({ params }: { params: Promise<{ id: s
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Card bearbeiten</h1>
+        <h1 className="text-2xl font-bold">Angebot bearbeiten</h1>
         <p className="text-sm text-white/50">{card.title}</p>
       </div>
-      <CardForm initial={initial} categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
+      <CardForm
+        initial={initial}
+        categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        mediaAssets={mediaAssets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          category: a.category,
+          fileUrl: a.fileUrl,
+          iconKey: a.iconKey,
+          accent: a.accent,
+          isSystemAsset: a.isSystemAsset,
+        }))}
+      />
     </div>
   );
 }

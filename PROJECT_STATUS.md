@@ -1,6 +1,6 @@
 # MaceSlotsBonus — Projektstatus
 
-Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau)
+Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS)
 
 ## Stabile Online-Baseline (Tag `mace-v1.3-online-baseline`)
 
@@ -726,3 +726,237 @@ geprüft:
   weicht.
 - Keine Änderung an Card-CRUD, Promo-Code-Copy, Tracking-Redirect, Auth oder
   Datenbankschema.
+
+---
+
+# Admin 2.0 — No-Code CMS
+
+Größter Umbau des Admin-Bereichs seit v1.0: Ziel war, dass ein technisch
+unerfahrener Betreiber seine Website vollständig selbst pflegen kann, ohne auf
+Begriffe wie Datenbank, JSON, API, Server Action, Dateipfad oder Environment
+Variable zu stoßen. Die technische Basis (Prisma/SQLite, Auth/Session,
+Tracking, Server Actions, Render-Deployment) wurde dafür **nicht neu gebaut**
+— nur additiv erweitert und die komplette Admin-Oberfläche neu strukturiert.
+
+## Neue Navigation
+
+Von "Dashboard / Cards / Kategorien / Design / Profil" auf sechs klar
+benannte Bereiche umgestellt: **Dashboard, Angebote, Medien, Design, Profil,
+Einstellungen**. "Kategorien" ist kein eigener Menüpunkt mehr, sondern über
+einen Button oben auf der Angebote-Seite erreichbar (Funktion unverändert,
+nur die vorherige Verwaltungsseite unter `/admin/categories` bleibt technisch
+bestehen). SEO-Felder und die optionalen Rechtstexte wurden aus "Profil" in
+den neuen Bereich "Einstellungen" verschoben, damit "Profil" für den
+alltäglichen Gebrauch übersichtlich bleibt.
+
+## Dashboard 2.0
+
+Neu aufgebaut nach Vorgabe: vier Kennzahlen oben (aktive Angebote, Entwürfe,
+Klicks heute, Klicks insgesamt — die bisherige "Klicks letzte 7 Tage" und
+"Meistgeklickte Cards"-Tabelle entfernt, wie gefordert "keine unnötigen
+Analytics-Diagramme"), große Schnellaktions-Kacheln (**+ Neues Angebot**,
+Meine Angebote, Seite bearbeiten, Design ändern, Öffentliche Seite ansehen)
+und ein neuer Bereich "Zuletzt bearbeitet" mit den drei zuletzt geänderten
+Angeboten inkl. Thumbnail/Icon und Status.
+
+## Angebote — visuelle Card-Verwaltung
+
+Die bisherige Tabelle (`cards-table.tsx`) wurde durch eine neue
+Card-basierte Ansicht (`offers-grid.tsx`) ersetzt: jede Zeile zeigt
+Bild/Motiv-Icon, Titel, Status, Kategorie, Klickzahl, Drag-Handle sowie
+Bearbeiten/Duplizieren/Aktivieren-Deaktivieren/Löschen als Icon-Buttons —
+exakt wie im Auftrag skizziert. Drag & Drop (weiterhin `dnd-kit`) speichert
+die Reihenfolge sofort ohne "Position speichern"-Schritt und zeigt kurz
+"Reihenfolge gespeichert ✓" an; zusätzlich gibt es Hoch-/Runter-Pfeile als
+barrierearme bzw. mobile Alternative. Löschen läuft jetzt über einen echten
+Bestätigungsdialog (siehe unten) statt über den nativen Browser-`confirm()`.
+
+## "Neues Angebot" als 5-Schritte-Assistent
+
+Kernstück des Umbaus: `card-wizard.tsx` führt durch **Stil → Bild → Inhalt →
+Kategorie → Vorschau**, statt ein großes Formular auf einmal zu zeigen.
+
+- **Stil**: sechs visuelle Presets (Purple Neon, Hot Pink, Royal Gold,
+  Midnight, VIP, Clean Dark) als Farbverlauf-Kacheln — keine Hex-Codes
+  sichtbar.
+- **Bild**: Galerie mit neun vorbereiteten Motiven (Trophy, Crown, Dice,
+  Playing Cards, Poker Chips, 777, VIP, Jackpot, Roulette) plus eigener
+  Upload, mit Kategorie-Filtern (Alle/Slots/Karten/Chips/Würfel/VIP/Jackpot/
+  Sonstiges).
+- **Inhalt**: nur Titel, Beschreibung, Highlight, Promo-Code, Buttontext und
+  "Wohin soll der Button führen?" — genau die im Auftrag geforderte
+  Feldauswahl, keine technischen Bezeichner sichtbar.
+- **Kategorie**: bestehende Kategorien als anklickbare Pillen, keine
+  Kategorie-ID sichtbar.
+- **Vorschau**: Live-Card exakt wie auf der öffentlichen Seite, mit
+  Desktop-/Smartphone-Umschalter, danach "Als Entwurf speichern" oder
+  "Veröffentlichen".
+
+Beide Speichern-Buttons nutzen weiterhin die bestehende, bereits getestete
+`createCardAction` (Feld `status` je nach geklicktem Button) — keine neue
+Backend-Logik, nur ein neuer Weg, dieselbe Aktion auszulösen.
+
+## Card-Editor vereinfacht
+
+Für das Bearbeiten bestehender Angebote (`card-form.tsx`) bleiben alle
+Felder erreichbar, aber neu gruppiert: Titel/Beschreibung/Highlight/
+Promo-Code/Button/Kategorie/Bild/Card-Stil/Status sind sofort sichtbar,
+alles andere (Badge, alter Preis, Rabatttext, Ablaufdatum, ausführlichere
+Beschreibung, Hinweistext, Stichwörter, zweiter Button) liegt hinter einem
+"Weitere Optionen"-Aufklapper. Live-Vorschau rechts (Desktop) bzw. über
+einen "Vorschau anzeigen"-Button (Mobil) blieb erhalten. `StylePicker` und
+`ImagePicker` wurden als eigene, wiederverwendbare Komponenten
+herausgezogen, damit Wizard und Editor exakt dieselbe Optik/Logik nutzen.
+
+## Card-Design-Presets
+
+Neue Datei `src/lib/card-styles.ts`: sechs benannte Stile mit
+Akzent-/Glow-Farben, die Card-Border, Badge, Preis-Highlight und
+CTA-Button einfärben. Card-Felder `stylePreset` und `mediaIconKey`
+(additiv, Prisma-Schema erweitert, `db push` non-destruktiv ausgeführt)
+speichern die Wahl; ist keins gesetzt, greift wie bisher die
+positionsbasierte Farbfolge — bestehende Demo-Cards sehen dadurch
+unverändert aus.
+
+## Medienbibliothek
+
+Neuer Adminbereich **Medien** (`/admin/media`) plus neues additives Modell
+`MediaAsset` (id, name, category, fileUrl, iconKey, accent, source,
+isSystemAsset, uploadedBy, createdAt). Die neun kuratierten Motive sind als
+`isSystemAsset: true` markiert und über die Admin-Oberfläche **nicht
+löschbar** (die Löschen-Aktion prüft serverseitig `isSystemAsset` und bricht
+sonst ab); eigene Uploads sind es. Gleiche Bild-Validierung wie bisher
+(JPG/PNG/WEBP, max. 5 MB, verständliche Fehlermeldung statt HTTP-Code) —
+`saveUploadedImage` in `storage.ts` wurde nicht verändert, nur ein neuer
+Aufrufer (`uploadMediaAction`) ergänzt, der zusätzlich eine `MediaAsset`-Zeile
+anlegt. Die Galerie ist bewusst nur eine technische Grundstruktur mit
+Icon-Platzhaltern — echte Bild-Assets sollen laut Auftrag später ersetzt
+werden.
+
+## Live-Vorschau
+
+Sowohl im Wizard (Schritt 5, mit Desktop-/Smartphone-Umschalter) als auch im
+Card-Editor (Desktop: fest sichtbar daneben; Mobil: über Button einblendbar)
+zeigt dieselbe `OfferCard`-Komponente wie die öffentliche Seite — Änderungen
+an Titel, Bild, Stil etc. sind sofort sichtbar, ohne Neuladen.
+
+## Design-Bereich vereinfacht
+
+`design-editor.tsx` neu geordnet: Design-Vorlage (Presets) oben, danach nur
+noch Hintergrund-Art, Hauptfarbe, Animationen Ein/Aus und Casino-Hintergrund
+Ein/Aus mit dreistufiger Intensität (Dezent/Normal/Stark statt Rohwert-
+Slidern — mappt intern auf Parallax-/Glow-/Partikel-Werte). Alle bisherigen
+Detail-Regler (Card-Farbe/-Transparenz/-Schatten, Text-/Button-Farben,
+Sekundärakzent, Featured-Farbe, Max. Inhaltsbreite, Partikel-Schalter) sind
+weiterhin vorhanden, aber hinter "Erweitert" versteckt. Automatisches
+Speichern und die Live-Vorschau blieben unverändert.
+
+## Profil & Einstellungen getrennt
+
+"Profil" zeigt jetzt nur Marke (Name, Beschreibung, **Logo-Upload neu
+ergänzt** — das Feld existierte in der Datenbank bereits, hatte aber bisher
+keine Oberfläche), Hinweistext, Funktionen (Teilen/Suche/Klickzahlen) und
+Social Media. "Einstellungen" zeigt die "Zusätzliche Seiten"
+(Impressum/Datenschutz/Affiliate-Hinweis/Kontakt/Eigener Hinweis) als
+Ein/Aus-Kacheln — ist eine Seite deaktiviert, verschwindet nur ihr
+Texteditor aus der Oberfläche; die öffentliche URL bleibt wie zuvor
+erreichbar. SEO liegt darunter hinter einem eigenen Aufklapper. Serverseitig
+wurde dafür `profileSchema` in `profileBrandSchema` und `siteSettingsSchema`
+aufgeteilt und `updateProfileAction` um `updateSiteSettingsAction` ergänzt —
+beide schreiben weiterhin in dieselbe `ProfileSettings`-Tabelle, keine neue
+Architektur.
+
+## Rollenmodell — vorbereitet, nicht ausgebaut
+
+Wie im Auftrag ausdrücklich als Option genannt ("Datenmodell und Architektur
+vorbereiten, UI aber transparent als späteren Schritt dokumentieren"): Das
+bestehende `User.role`-Feld (String, aktuell immer `"ADMIN"`) ist bereits
+vorhanden und erweiterbar für eine künftige OWNER/ADMIN-Unterscheidung. Eine
+vollständige Benutzerverwaltung (`Einstellungen → Benutzer`: Benutzer
+anlegen, Passwort zurücksetzen, deaktivieren, Schutz vor Löschen des letzten
+Admins) wurde in diesem Schritt **nicht gebaut** — das wäre über den Rahmen
+eines "keine Neuarchitektur"-Auftrags hinausgegangen und ist als nächster
+Schritt hier dokumentiert, nicht heimlich ausgelassen.
+
+## Bestätigungsdialoge & Rückmeldungen
+
+Neue, geteilte Komponenten `confirm-dialog.tsx` (`useConfirm()`-Hook, ersetzt
+`window.confirm()` für Löschen-Aktionen bei Angeboten und Medien) und
+`toast-provider.tsx` (`useToast()`-Hook) — beide in `AdminShell` gemountet,
+damit jede Admin-Seite sie nutzen kann. Rückmeldungen wie "Angebot gespeichert
+✓", "Angebot veröffentlicht ✓", "Bild hochgeladen ✓", "Reihenfolge
+gespeichert ✓", "Design aktualisiert" und "Angebot gelöscht ✓" erscheinen
+jetzt als Toast statt stiller Redirects. Für den Wizard/Editor (die per
+Server-Redirect auf die Angebote-Seite zurückspringen) übernimmt eine kleine
+Helper-Komponente (`toast-from-query.tsx`) die Übergabe per einmaligem
+Query-Parameter, der danach aus der URL entfernt wird.
+
+## Mobile Admin
+
+Bestehende Hamburger-Navigation (`AdminShell`) unverändert übernommen;
+`OffersGrid` stellt auf Mobil die Pfeil-Buttons statt des Drag-Handles in
+den Vordergrund, Formulare bleiben einspaltig. Bei 375px geprüft: kein
+horizontales Scrollen auf Dashboard, Angebote, Wizard, Medien, Design,
+Profil, Einstellungen.
+
+## Tests
+
+35 bestehende Tests weiterhin grün. Neu hinzugekommen (**51/51 insgesamt**):
+
+- `card-styles.test.ts` — die sechs Presets existieren, liefern gültige
+  Farben, `getCardStyle` fällt bei unbekanntem/fehlendem Schlüssel sauber
+  auf den Standard zurück.
+- `media.test.ts` — alle neun kuratierten Motive haben ein passendes Icon in
+  der Registry, Kategorien sind gültig.
+- `storage.test.ts` — Upload-Validierung (leere Datei, über 5 MB, falscher
+  Dateityp, Inhalt passt nicht zum angegebenen Format) liefert verständliche
+  Fehlermeldungen; bewusst nur die Ablehnungs-Pfade getestet, damit keine
+  echten Dateien in `public/uploads/` landen.
+- `card-crud.test.ts` (erweitert) — `mediaIconKey`/`stylePreset` laufen
+  korrekt durch Anlegen/Lesen, Duplizieren übernimmt beide Felder und setzt
+  den Status auf Entwurf, System-Medien überleben das Löschen eigener
+  Uploads (Schutz-Logik nachgebildet).
+
+## Manueller Browser-Check (Admin 2.0)
+
+Durchgeführt gegen einen echten **Production-Build** (`npm run build && npm
+run start`), nicht nur den Dev-Server:
+
+- Vollständiger Workflow: Login → Neues Angebot → Stil (Royal Gold) → Bild
+  (Crown aus der Galerie) → Inhalt ausgefüllt → Kategorie (VIP) → Vorschau
+  (Gold-CTA + Crown-Icon bestätigt) → Veröffentlichen → Angebot erscheint in
+  der Angebote-Liste und auf der öffentlichen Seite
+- Drag-&-Drop-Alternative (Pfeil-Buttons) getestet: Reihenfolge ändert sich
+  sofort und übersteht ein Neuladen (serverseitig persistiert)
+  bestätigt — kein natives Browser-Popup mehr
+- Testkarte wieder gelöscht, Demo-Datenstand (4 Cards) wiederhergestellt
+- Medien-, Design-, Profil- und Einstellungen-Seiten einzeln aufgerufen,
+  öffentliche Seite geprüft — überall keine Konsolenfehler im
+  Production-Build
+- 375px-Ansicht für Angebote-Liste und Wizard geprüft: kein horizontales
+  Scrollen
+
+**Bekannte Einschränkung des Dev-Servers (nicht der Anwendung):** Im
+Next.js-Dev-Modus erscheint bei der neuen Angebote-Seite ein
+Hydration-Warnhinweis von `dnd-kit` (`aria-describedby="DndDescribedBy-N"`
+weicht zwischen Server- und Client-Render ab). Das ist ein bekannter,
+React-StrictMode-spezifischer Effekt von `dnd-kit`s internem
+ID-Zähler unter Reacts absichtlicher doppelter Render-Ausführung in der
+Entwicklungsumgebung — **im echten Production-Build (identisch mit dem
+Render-Deployment) tritt der Hinweis nicht auf**, mehrfach gegengeprüft
+inklusive wiederholter Navigation. Keine funktionale Auswirkung
+festgestellt.
+
+## Bewusst nicht umgesetzt
+
+- Vollständige Benutzerverwaltung (`Einstellungen → Benutzer`) — Datenmodell
+  vorbereitet (`User.role`), UI als nächster Schritt dokumentiert statt
+  überstürzt gebaut.
+- Echte, individuell gestaltete Bild-Assets für die neun Medien-Motive —
+  aktuell Icon-Platzhalter, wie im Auftrag als Zwischenschritt vorgesehen
+  ("Jetzt zunächst technische Struktur schaffen").
+- Keine Postgres-Migration, kein Storage-Wechsel, keine Hosting-Änderung,
+  kein Deploy — wie im Auftrag ausdrücklich ausgeschlossen. Der aktuelle
+  Stand liegt nur lokal committet vor, noch nicht auf `master` gepusht bzw.
+  nicht auf Render deployt (siehe Abschlussbericht im Chat für die
+  Freigabe-Rückfrage).

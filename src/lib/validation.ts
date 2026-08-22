@@ -21,6 +21,8 @@ export const cardSchema = z.object({
   longDesc: z.string().trim().max(4000).optional().nullable(),
   imageUrl: z.string().trim().max(2048).optional().nullable(),
   imageAlt: z.string().trim().max(200).optional().nullable(),
+  mediaIconKey: z.string().trim().max(40).optional().nullable(),
+  stylePreset: z.string().trim().max(40).optional().nullable(),
   badge: z.string().trim().max(40).optional().nullable(),
   promoCode: z.string().trim().max(60).optional().nullable(),
   oldPrice: z.string().trim().max(40).optional().nullable(),
@@ -72,13 +74,21 @@ export const socialLinkSchema = z.object({
 
 export type SocialLinkInput = z.infer<typeof socialLinkSchema>;
 
-export const profileSchema = z.object({
+// Split in two, matching the two admin pages that edit ProfileSettings:
+// "Profil" (Marke/Social/Funktionen — the everyday stuff) and
+// "Einstellungen" (SEO + optional legal pages — the rarely-touched stuff).
+export const profileBrandSchema = z.object({
   brandName: z.string().trim().min(1).max(80),
   description: z.string().trim().max(400),
   noticeText: z.string().trim().max(300).optional().nullable(),
   shareEnabled: z.boolean().default(true),
   publicClicksVisible: z.boolean().default(false),
   searchEnabled: z.boolean().default(true),
+});
+
+export type ProfileBrandInput = z.infer<typeof profileBrandSchema>;
+
+export const siteSettingsSchema = z.object({
   seoTitle: z.string().trim().max(120).optional().nullable(),
   seoDescription: z.string().trim().max(300).optional().nullable(),
   canonicalUrl: z.string().trim().max(300).optional().nullable(),
@@ -95,7 +105,7 @@ export const profileSchema = z.object({
   showDisclaimerLink: z.boolean().default(true),
 });
 
-export type ProfileInput = z.infer<typeof profileSchema>;
+export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 
 export const loginSchema = z.object({
   identifier: z.string().trim().min(1, "Benutzername oder E-Mail erforderlich"),

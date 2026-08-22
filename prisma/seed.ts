@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_DESIGN, BUILT_IN_THEMES } from "../src/lib/design";
+import { SYSTEM_MEDIA_MOTIFS } from "../src/lib/media";
 
 const prisma = new PrismaClient();
 
@@ -148,11 +149,31 @@ async function seedCategoriesAndCards() {
   }
 }
 
+async function seedMedia() {
+  for (const motif of SYSTEM_MEDIA_MOTIFS) {
+    const existing = await prisma.mediaAsset.findFirst({
+      where: { iconKey: motif.iconKey, isSystemAsset: true },
+    });
+    if (existing) continue;
+    await prisma.mediaAsset.create({
+      data: {
+        name: motif.name,
+        category: motif.category,
+        iconKey: motif.iconKey,
+        accent: motif.accent,
+        source: "system",
+        isSystemAsset: true,
+      },
+    });
+  }
+}
+
 async function main() {
   await seedAdmin();
   await seedProfile();
   await seedThemes();
   await seedCategoriesAndCards();
+  await seedMedia();
 }
 
 main()

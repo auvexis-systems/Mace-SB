@@ -97,6 +97,8 @@ model Card {
   longDesc    String?
   imageUrl    String?
   imageAlt    String?
+  mediaIconKey String? // key into the built-in motif set (src/lib/media.ts), used when no imageUrl is set
+  stylePreset String? // key into the card design presets (src/lib/card-styles.ts)
   badge       String?
   promoCode   String?
   oldPrice    String?
@@ -128,6 +130,26 @@ model Card {
 
   @@index([status])
   @@index([position])
+}
+
+// Media library: curated built-in motifs ("system assets", not deletable) plus
+// operator-uploaded images. Kept as a flat, simple model on purpose — no
+// relation to Card is enforced, an admin just copies fileUrl/mediaIconKey
+// onto a Card when "using" an asset, the same way image-upload.tsx already
+// works today. Additive, non-destructive.
+model MediaAsset {
+  id             String   @id @default(cuid())
+  name           String
+  category       String   @default("sonstiges")
+  fileUrl        String? // set for uploaded images
+  iconKey        String? // set for built-in system motifs (no file on disk)
+  accent         String   @default("accent") // accent | accent2 | featured
+  source         String   @default("system") // "system" | "upload"
+  isSystemAsset  Boolean  @default(false)
+  uploadedBy     String?
+  createdAt      DateTime @default(now())
+
+  @@index([category])
 }
 
 model SocialLink {

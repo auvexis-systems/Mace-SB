@@ -4,17 +4,19 @@ import { useRef, useState, useTransition } from "react";
 import { DEFAULT_DESIGN, BUILT_IN_THEMES, designToCssVars, type DesignConfig } from "@/lib/design";
 import { updateDesignAction, applyThemePresetAction } from "@/lib/actions/profile";
 import { OfferCard, type PublicCardData } from "@/components/public/offer-card";
-import { Check, Save } from "lucide-react";
+import { Check, Save, ChevronDown } from "lucide-react";
 
 type Theme = { id: string; name: string };
 
 const PREVIEW_CARD: PublicCardData = {
   id: "preview",
   title: "Demo Offer Alpha",
-  shortDesc: "So sieht eine Card mit Ihrem Design aus.",
+  shortDesc: "So sieht eine Card mit deinem Design aus.",
   longDesc: null,
   imageUrl: null,
   imageAlt: null,
+  mediaIconKey: null,
+  stylePreset: null,
   badge: "Neu",
   promoCode: "DEMO10",
   oldPrice: "49€",
@@ -30,6 +32,27 @@ const PREVIEW_CARD: PublicCardData = {
   featured: true,
   category: null,
 };
+
+type IntensityLevel = "dezent" | "normal" | "stark";
+
+const INTENSITY_PRESETS: Record<IntensityLevel, { parallaxStrength: number; glowIntensity: number; particleIntensity: DesignConfig["particleIntensity"] }> = {
+  dezent: { parallaxStrength: 20, glowIntensity: 30, particleIntensity: "low" },
+  normal: { parallaxStrength: 45, glowIntensity: 55, particleIntensity: "low" },
+  stark: { parallaxStrength: 75, glowIntensity: 80, particleIntensity: "medium" },
+};
+
+function closestIntensity(design: DesignConfig): IntensityLevel {
+  let best: IntensityLevel = "normal";
+  let bestDiff = Infinity;
+  (Object.keys(INTENSITY_PRESETS) as IntensityLevel[]).forEach((level) => {
+    const diff = Math.abs(INTENSITY_PRESETS[level].parallaxStrength - design.parallaxStrength);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = level;
+    }
+  });
+  return best;
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -91,6 +114,7 @@ export function DesignEditor({
   const [design, setDesign] = useState<DesignConfig>(initialDesign);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(activeThemeId);
   const [saved, setSaved] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -98,6 +122,22 @@ export function DesignEditor({
     setSelectedTheme(null);
     setDesign((d) => {
       const next = { ...d, [key]: value };
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        startTransition(async () => {
+          await updateDesignAction(next, null);
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1500);
+        });
+      }, 400);
+      return next;
+    });
+  }
+
+  function updateMany(patch: Partial<DesignConfig>) {
+    setSelectedTheme(null);
+    setDesign((d) => {
+      const next = { ...d, ...patch };
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         startTransition(async () => {
@@ -121,6 +161,7 @@ export function DesignEditor({
   }
 
   const cssVars = designToCssVars(design) as React.CSSProperties;
+  const currentIntensity = closestIntensity(design);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-8 items-start">
@@ -141,7 +182,7 @@ export function DesignEditor({
         </div>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-white/80">Theme-Presets</h2>
+          <h2 className="mb-3 text-sm font-semibold text-white/80">Design-Vorlage</h2>
           <div className="grid grid-cols-2 gap-2">
             {themes.map((t) => (
               <ThemeButton key={t.id} theme={t} active={selectedTheme === t.id} onApply={applyTheme} />
@@ -151,30 +192,17 @@ export function DesignEditor({
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <h2 className="mb-2 text-sm font-semibold text-white/80">Hintergrund</h2>
-          <Row label="Typ">
+          <Row label="Art">
             <select
               value={design.backgroundType}
               onChange={(e) => update("backgroundType", e.target.value as DesignConfig["backgroundType"])}
               className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm"
             >
-              <option value="solid">Einfarbig</option>
+              <option value="solid">Dunkel</option>
               <option value="gradient">Gradient</option>
               <option value="image">Bild</option>
             </select>
           </Row>
-          <Row label="Farbe 1">
-            <ColorInput value={design.bgColor1} onChange={(v) => update("bgColor1", v)} />
-          </Row>
-          {design.backgroundType === "gradient" && (
-            <>
-              <Row label="Farbe 2">
-                <ColorInput value={design.bgColor2} onChange={(v) => update("bgColor2", v)} />
-              </Row>
-              <Row label="Winkel">
-                <RangeInput value={design.bgGradientAngle} onChange={(v) => update("bgGradientAngle", v)} min={0} max={360} />
-              </Row>
-            </>
-          )}
           {design.backgroundType === "image" && (
             <Row label="Bild-URL">
               <input
@@ -185,108 +213,29 @@ export function DesignEditor({
               />
             </Row>
           )}
-          <Row label="Overlay">
-            <input
-              type="checkbox"
-              checked={design.bgOverlay}
-              onChange={(e) => update("bgOverlay", e.target.checked)}
-            />
-          </Row>
-          {design.bgOverlay && (
-            <Row label="Overlay-Stärke">
-              <RangeInput value={design.bgOverlayStrength} onChange={(v) => update("bgOverlayStrength", v)} min={0} max={100} />
-            </Row>
-          )}
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-white/80">Cards</h2>
-          <Row label="Farbe">
-            <ColorInput value={design.cardColor} onChange={(v) => update("cardColor", v)} />
-          </Row>
-          <Row label="Transparenz">
-            <RangeInput value={design.cardOpacity} onChange={(v) => update("cardOpacity", v)} min={0} max={100} />
-          </Row>
-          <Row label="Border-Farbe">
-            <ColorInput value={design.cardBorderColor} onChange={(v) => update("cardBorderColor", v)} />
-          </Row>
-          <Row label="Rundung">
-            <RangeInput value={design.cardRadius} onChange={(v) => update("cardRadius", v)} min={0} max={40} />
-          </Row>
-          <Row label="Schatten">
-            <select
-              value={design.cardShadow}
-              onChange={(e) => update("cardShadow", e.target.value as DesignConfig["cardShadow"])}
-              className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm"
-            >
-              <option value="none">Kein</option>
-              <option value="soft">Sanft</option>
-              <option value="medium">Mittel</option>
-              <option value="strong">Stark</option>
-            </select>
-          </Row>
-          <Row label="Glow-Stärke (Featured)">
-            <RangeInput value={design.cardGlowStrength} onChange={(v) => update("cardGlowStrength", v)} min={0} max={100} />
-          </Row>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-white/80">Text</h2>
-          <Row label="Haupttextfarbe">
-            <ColorInput value={design.textPrimary} onChange={(v) => update("textPrimary", v)} />
-          </Row>
-          <Row label="Sekundärtextfarbe">
-            <ColorInput value={design.textSecondary} onChange={(v) => update("textSecondary", v)} />
-          </Row>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-white/80">Buttons</h2>
-          <Row label="Farbe">
-            <ColorInput value={design.buttonColor} onChange={(v) => update("buttonColor", v)} />
-          </Row>
-          <Row label="Textfarbe">
-            <ColorInput value={design.buttonTextColor} onChange={(v) => update("buttonTextColor", v)} />
-          </Row>
-          <Row label="Rundung">
-            <RangeInput value={design.buttonRadius} onChange={(v) => update("buttonRadius", v)} min={0} max={30} />
-          </Row>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-white/80">Allgemein</h2>
+          <h2 className="mb-2 text-sm font-semibold text-white/80">Hauptfarbe</h2>
           <Row label="Akzentfarbe">
             <ColorInput value={design.accentColor} onChange={(v) => update("accentColor", v)} />
           </Row>
-          <Row label="Max. Inhaltsbreite">
-            <RangeInput value={design.maxContentWidth} onChange={(v) => update("maxContentWidth", v)} min={400} max={1400} />
-          </Row>
-          <Row label="Card-Abstand">
-            <RangeInput value={design.cardGap} onChange={(v) => update("cardGap", v)} min={8} max={40} />
-          </Row>
-          <Row label="Animationen">
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <h2 className="mb-2 text-sm font-semibold text-white/80">Animationen</h2>
+          <Row label="Ein / Aus">
             <input
               type="checkbox"
               checked={design.animationsEnabled}
               onChange={(e) => update("animationsEnabled", e.target.checked)}
             />
           </Row>
-          <button
-            type="button"
-            onClick={() => {
-              setDesign(DEFAULT_DESIGN);
-              setSelectedTheme(null);
-              startTransition(() => updateDesignAction(DEFAULT_DESIGN, null));
-            }}
-            className="mt-3 text-xs text-white/40 hover:text-white/70 hover:underline"
-          >
-            Auf Standard zurücksetzen
-          </button>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-white/80">Casino-Hintergrund &amp; Bewegung</h2>
-          <Row label="Casino-Hintergrund aktiv">
+          <h2 className="mb-2 text-sm font-semibold text-white/80">Casino-Hintergrund</h2>
+          <Row label="Ein / Aus">
             <input
               type="checkbox"
               checked={design.casinoBackgroundEnabled}
@@ -294,38 +243,145 @@ export function DesignEditor({
             />
           </Row>
           {design.casinoBackgroundEnabled && (
-            <Row label="Parallax-Stärke">
-              <RangeInput value={design.parallaxStrength} onChange={(v) => update("parallaxStrength", v)} min={0} max={100} />
+            <Row label="Intensität">
+              <div className="flex gap-1 rounded-lg border border-white/10 p-1">
+                {(["dezent", "normal", "stark"] as IntensityLevel[]).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => updateMany(INTENSITY_PRESETS[level])}
+                    className={`rounded-md px-2.5 py-1 text-xs capitalize ${
+                      currentIntensity === level ? "bg-violet-600 text-white" : "text-white/50 hover:bg-white/10"
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
             </Row>
           )}
-          <Row label="Partikel aktiv">
-            <input
-              type="checkbox"
-              checked={design.particlesEnabled}
-              onChange={(e) => update("particlesEnabled", e.target.checked)}
-            />
-          </Row>
-          {design.particlesEnabled && (
-            <Row label="Partikelintensität">
-              <select
-                value={design.particleIntensity}
-                onChange={(e) => update("particleIntensity", e.target.value as DesignConfig["particleIntensity"])}
-                className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm"
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="flex w-full items-center justify-between text-left text-sm font-semibold text-white/80"
+          >
+            Erweitert
+            <ChevronDown className={`h-4 w-4 text-white/40 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {advancedOpen && (
+            <div className="mt-4 flex flex-col gap-6">
+              {design.backgroundType !== "solid" && (
+                <div>
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Hintergrund</h3>
+                  {design.backgroundType === "gradient" && (
+                    <>
+                      <Row label="Farbe 1">
+                        <ColorInput value={design.bgColor1} onChange={(v) => update("bgColor1", v)} />
+                      </Row>
+                      <Row label="Farbe 2">
+                        <ColorInput value={design.bgColor2} onChange={(v) => update("bgColor2", v)} />
+                      </Row>
+                      <Row label="Winkel">
+                        <RangeInput value={design.bgGradientAngle} onChange={(v) => update("bgGradientAngle", v)} min={0} max={360} />
+                      </Row>
+                    </>
+                  )}
+                  <Row label="Abdunklung">
+                    <input type="checkbox" checked={design.bgOverlay} onChange={(e) => update("bgOverlay", e.target.checked)} />
+                  </Row>
+                  {design.bgOverlay && (
+                    <Row label="Abdunklung-Stärke">
+                      <RangeInput value={design.bgOverlayStrength} onChange={(v) => update("bgOverlayStrength", v)} min={0} max={100} />
+                    </Row>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Cards</h3>
+                <Row label="Farbe">
+                  <ColorInput value={design.cardColor} onChange={(v) => update("cardColor", v)} />
+                </Row>
+                <Row label="Transparenz">
+                  <RangeInput value={design.cardOpacity} onChange={(v) => update("cardOpacity", v)} min={0} max={100} />
+                </Row>
+                <Row label="Rundung">
+                  <RangeInput value={design.cardRadius} onChange={(v) => update("cardRadius", v)} min={0} max={40} />
+                </Row>
+                <Row label="Schatten">
+                  <select
+                    value={design.cardShadow}
+                    onChange={(e) => update("cardShadow", e.target.value as DesignConfig["cardShadow"])}
+                    className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm"
+                  >
+                    <option value="none">Kein</option>
+                    <option value="soft">Sanft</option>
+                    <option value="medium">Mittel</option>
+                    <option value="strong">Stark</option>
+                  </select>
+                </Row>
+                <Row label="Abstand zwischen Cards">
+                  <RangeInput value={design.cardGap} onChange={(v) => update("cardGap", v)} min={8} max={40} />
+                </Row>
+              </div>
+
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Text &amp; Buttons</h3>
+                <Row label="Haupttextfarbe">
+                  <ColorInput value={design.textPrimary} onChange={(v) => update("textPrimary", v)} />
+                </Row>
+                <Row label="Sekundärtextfarbe">
+                  <ColorInput value={design.textSecondary} onChange={(v) => update("textSecondary", v)} />
+                </Row>
+                <Row label="Button-Farbe">
+                  <ColorInput value={design.buttonColor} onChange={(v) => update("buttonColor", v)} />
+                </Row>
+                <Row label="Button-Textfarbe">
+                  <ColorInput value={design.buttonTextColor} onChange={(v) => update("buttonTextColor", v)} />
+                </Row>
+              </div>
+
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Weitere Akzentfarben</h3>
+                <Row label="Sekundärer Akzent">
+                  <ColorInput value={design.secondaryAccentColor} onChange={(v) => update("secondaryAccentColor", v)} />
+                </Row>
+                <Row label="Featured-Farbe">
+                  <ColorInput value={design.featuredColor} onChange={(v) => update("featuredColor", v)} />
+                </Row>
+              </div>
+
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Layout</h3>
+                <Row label="Max. Inhaltsbreite">
+                  <RangeInput value={design.maxContentWidth} onChange={(v) => update("maxContentWidth", v)} min={400} max={1400} />
+                </Row>
+                <Row label="Partikel">
+                  <input
+                    type="checkbox"
+                    checked={design.particlesEnabled}
+                    onChange={(e) => update("particlesEnabled", e.target.checked)}
+                  />
+                </Row>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDesign(DEFAULT_DESIGN);
+                  setSelectedTheme(null);
+                  startTransition(() => updateDesignAction(DEFAULT_DESIGN, null));
+                }}
+                className="self-start text-xs text-white/40 hover:text-white/70 hover:underline"
               >
-                <option value="low">Niedrig</option>
-                <option value="medium">Mittel</option>
-              </select>
-            </Row>
+                Auf Standard zurücksetzen
+              </button>
+            </div>
           )}
-          <Row label="Glow-Intensität">
-            <RangeInput value={design.glowIntensity} onChange={(v) => update("glowIntensity", v)} min={0} max={100} />
-          </Row>
-          <Row label="Sekundärer Akzent">
-            <ColorInput value={design.secondaryAccentColor} onChange={(v) => update("secondaryAccentColor", v)} />
-          </Row>
-          <Row label="Featured-Farbe">
-            <ColorInput value={design.featuredColor} onChange={(v) => update("featuredColor", v)} />
-          </Row>
         </section>
       </div>
 

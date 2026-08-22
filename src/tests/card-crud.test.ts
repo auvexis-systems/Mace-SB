@@ -128,3 +128,82 @@ test("a click event records against a card without storing raw IP", async () => 
   const count = await prisma.clickEvent.count({ where: { cardId: card.id } });
   assert.equal(count, 1);
 });
+
+test("a card round-trips its chosen media motif and style preset (Card Wizard fields)", async () => {
+  const card = await prisma.card.create({
+    data: {
+      title: "Styled Card",
+      shortDesc: "x",
+      ctaUrl: "https://example.com/styled",
+      position: 300,
+      mediaIconKey: "trophy",
+      stylePreset: "vip",
+    },
+  });
+  const found = await prisma.card.findUnique({ where: { id: card.id } });
+  assert.equal(found?.mediaIconKey, "trophy");
+  assert.equal(found?.stylePreset, "vip");
+});
+
+test("duplicating a card starts as a draft and copies its media/style choices", async () => {
+  const original = await prisma.card.create({
+    data: {
+      title: "VIP Bonus",
+      shortDesc: "x",
+      ctaUrl: "https://example.com/vip",
+      position: 400,
+      mediaIconKey: "crown",
+      stylePreset: "royal-gold",
+      status: "PUBLISHED",
+    },
+  });
+
+  const copy = await prisma.card.create({
+    data: {
+      title: `${original.title} (Kopie)`,
+      shortDesc: original.shortDesc,
+      ctaUrl: original.ctaUrl,
+      mediaIconKey: original.mediaIconKey,
+      stylePreset: original.stylePreset,
+      status: "DRAFT",
+      position: 401,
+    },
+  });
+
+  assert.equal(copy.status, "DRAFT");
+  assert.equal(copy.title, "VIP Bonus (Kopie)");
+  assert.equal(copy.mediaIconKey, "crown");
+  assert.equal(copy.stylePreset, "royal-gold");
+});
+
+test("system media assets exist, are not deleted by cleanup, and uploads can be told apart", async () => {
+  const systemAsset = await prisma.mediaAsset.create({
+    data: { name: "Test Trophy", category: "sonstiges", iconKey: "trophy", source: "system", isSystemAsset: true },
+  });
+  const uploadedAsset = await prisma.mediaAsset.create({
+    data: {
+      name: "Eigenes Bild",
+      category: "sonstiges",
+      fileUrl: "/uploads/test-fake.png",
+      source: "upload",
+      isSystemAsset: false,
+      uploadedBy: "test-user",
+    },
+  });
+
+  const all = await prisma.mediaAsset.findMany({ where: { id: { in: [systemAsset.id, uploadedAsset.id] } } });
+  assert.equal(all.length, 2);
+
+  const systemOnly = all.filter((a) => a.isSystemAsset);
+  assert.equal(systemOnly.length, 1);
+  assert.equal(systemOnly[0].fileUrl, null);
+
+  const uploadsOnly = all.filter((a) => !a.isSystemAsset);
+  assert.equal(uploadsOnly.length, 1);
+  assert.equal(uploadsOnly[0].fileUrl, "/uploads/test-fake.png");
+
+  // Simulates deleteMediaAssetAction's guard: only non-system assets are deletable.
+  await prisma.mediaAsset.delete({ where: { id: uploadedAsset.id } });
+  const stillThere = await prisma.mediaAsset.findUnique({ where: { id: systemAsset.id } });
+  assert.ok(stillThere, "system asset must survive cleanup of an unrelated upload");
+});

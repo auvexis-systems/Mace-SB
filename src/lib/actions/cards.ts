@@ -22,6 +22,8 @@ function parseCardForm(formData: FormData) {
     longDesc: formData.get("longDesc") || null,
     imageUrl: formData.get("imageUrl") || null,
     imageAlt: formData.get("imageAlt") || null,
+    mediaIconKey: formData.get("mediaIconKey") || null,
+    stylePreset: formData.get("stylePreset") || null,
     badge: formData.get("badge") || null,
     promoCode: formData.get("promoCode") || null,
     oldPrice: formData.get("oldPrice") || null,
@@ -73,7 +75,7 @@ export async function createCardAction(
 
   revalidatePath("/");
   revalidatePath("/admin/cards");
-  redirect("/admin/cards");
+  redirect(`/admin/cards?${parsed.data.status === "PUBLISHED" ? "published" : "created"}=1`);
 }
 
 export async function updateCardAction(
@@ -105,7 +107,7 @@ export async function updateCardAction(
 
   revalidatePath("/");
   revalidatePath("/admin/cards");
-  redirect("/admin/cards");
+  redirect("/admin/cards?saved=1");
 }
 
 export async function deleteCardAction(id: string) {
@@ -130,6 +132,8 @@ export async function duplicateCardAction(id: string) {
       longDesc: original.longDesc,
       imageUrl: original.imageUrl,
       imageAlt: original.imageAlt,
+      mediaIconKey: original.mediaIconKey,
+      stylePreset: original.stylePreset,
       badge: original.badge,
       promoCode: original.promoCode,
       oldPrice: original.oldPrice,

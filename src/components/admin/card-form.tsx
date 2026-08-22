@@ -2,9 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { createCardAction, updateCardAction, type CardFormState } from "@/lib/actions/cards";
-import { ImageUpload } from "@/components/admin/image-upload";
+import { type MediaAssetItem } from "@/components/admin/media-library";
+import { StylePicker } from "@/components/admin/style-picker";
+import { ImagePicker } from "@/components/admin/image-picker";
 import { OfferCard, type PublicCardData } from "@/components/public/offer-card";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ChevronDown } from "lucide-react";
 
 type Category = { id: string; name: string };
 
@@ -15,6 +17,8 @@ export type CardFormValues = {
   longDesc: string;
   imageUrl: string | null;
   imageAlt: string;
+  mediaIconKey: string | null;
+  stylePreset: string;
   badge: string;
   promoCode: string;
   oldPrice: string;
@@ -40,6 +44,8 @@ const EMPTY: CardFormValues = {
   longDesc: "",
   imageUrl: null,
   imageAlt: "",
+  mediaIconKey: null,
+  stylePreset: "purple-neon",
   badge: "",
   promoCode: "",
   oldPrice: "",
@@ -47,7 +53,7 @@ const EMPTY: CardFormValues = {
   discountText: "",
   expiresAt: "",
   hint: "",
-  ctaText: "Jetzt ansehen",
+  ctaText: "Zum Angebot",
   ctaUrl: "",
   ctaNewTab: true,
   cta2Text: "",
@@ -83,13 +89,16 @@ const inputClass =
 export function CardForm({
   initial,
   categories,
+  mediaAssets,
 }: {
   initial?: CardFormValues;
   categories: Category[];
+  mediaAssets: MediaAssetItem[];
 }) {
   const isEdit = Boolean(initial?.id);
   const [values, setValues] = useState<CardFormValues>(initial ?? EMPTY);
   const [showPreview, setShowPreview] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const action = isEdit
     ? updateCardAction.bind(null, initial!.id!)
@@ -104,11 +113,13 @@ export function CardForm({
 
   const previewCard: PublicCardData = {
     id: "preview",
-    title: values.title || "Titel der Card",
-    shortDesc: values.shortDesc || "Kurzbeschreibung der Card",
+    title: values.title || "Titel des Angebots",
+    shortDesc: values.shortDesc || "Kurzbeschreibung des Angebots",
     longDesc: values.longDesc || null,
     imageUrl: values.imageUrl,
     imageAlt: values.imageAlt || null,
+    mediaIconKey: values.mediaIconKey,
+    stylePreset: values.stylePreset || null,
     badge: values.badge || null,
     promoCode: values.promoCode || null,
     oldPrice: values.oldPrice || null,
@@ -116,7 +127,7 @@ export function CardForm({
     discountText: values.discountText || null,
     expiresAt: values.expiresAt || null,
     hint: values.hint || null,
-    ctaText: values.ctaText || "Jetzt ansehen",
+    ctaText: values.ctaText || "Zum Angebot",
     cta2Text: values.cta2Text || null,
     cta2Url: values.cta2Url || null,
     cta2NewTab: values.cta2NewTab,
@@ -137,105 +148,37 @@ export function CardForm({
             <input
               name="title"
               required
+              placeholder="z. B. VIP Bonus"
               value={values.title}
               onChange={(e) => set("title", e.target.value)}
               className={inputClass}
             />
           </Field>
-          <Field label="Kurzbeschreibung *" error={state.fieldErrors?.shortDesc}>
+          <Field label="Beschreibung *" error={state.fieldErrors?.shortDesc}>
             <input
               name="shortDesc"
               required
+              placeholder="Kurzer Text, der das Angebot beschreibt"
               value={values.shortDesc}
               onChange={(e) => set("shortDesc", e.target.value)}
               className={inputClass}
             />
           </Field>
-          <Field label="Langbeschreibung">
-            <textarea
-              name="longDesc"
-              rows={3}
-              value={values.longDesc}
-              onChange={(e) => set("longDesc", e.target.value)}
-              className={inputClass}
-            />
+          <Field label="Highlight (z. B. „100 Freispiele“)">
+            <input name="newPrice" value={values.newPrice} onChange={(e) => set("newPrice", e.target.value)} className={inputClass} />
           </Field>
-          <Field label="Kategorie">
-            <select
-              name="categoryId"
-              value={values.categoryId}
-              onChange={(e) => set("categoryId", e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Ohne Kategorie</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Tags (durch Komma getrennt)">
-            <input
-              name="tags"
-              value={values.tags}
-              onChange={(e) => set("tags", e.target.value)}
-              placeholder="z.B. neu, empfehlung"
-              className={inputClass}
-            />
+          <Field label="Promo-Code (optional)">
+            <input name="promoCode" value={values.promoCode} onChange={(e) => set("promoCode", e.target.value)} className={inputClass} />
           </Field>
         </section>
 
         <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white/80">Bild</h2>
-          <ImageUpload
-            value={values.imageUrl}
-            onChange={(url) => set("imageUrl", url)}
-            altValue={values.imageAlt}
-            onAltChange={(alt) => set("imageAlt", alt)}
-          />
-        </section>
-
-        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white/80">Angebot</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Badge">
-              <input name="badge" value={values.badge} onChange={(e) => set("badge", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Promo-Code">
-              <input name="promoCode" value={values.promoCode} onChange={(e) => set("promoCode", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Alter Preis">
-              <input name="oldPrice" value={values.oldPrice} onChange={(e) => set("oldPrice", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Neuer Preis">
-              <input name="newPrice" value={values.newPrice} onChange={(e) => set("newPrice", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Rabatttext">
-              <input name="discountText" value={values.discountText} onChange={(e) => set("discountText", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Ablaufdatum">
-              <input
-                type="date"
-                name="expiresAt"
-                value={values.expiresAt}
-                onChange={(e) => set("expiresAt", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </div>
-          <Field label="Hinweis">
-            <input name="hint" value={values.hint} onChange={(e) => set("hint", e.target.value)} className={inputClass} />
-          </Field>
-        </section>
-
-        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white/80">Call-to-Action</h2>
+          <h2 className="text-sm font-semibold text-white/80">Button</h2>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Buttontext">
               <input name="ctaText" value={values.ctaText} onChange={(e) => set("ctaText", e.target.value)} className={inputClass} />
             </Field>
-            <Field label="Ziel-URL *" error={state.fieldErrors?.ctaUrl}>
+            <Field label="Wohin soll der Button führen? *" error={state.fieldErrors?.ctaUrl}>
               <input
                 name="ctaUrl"
                 required
@@ -246,33 +189,56 @@ export function CardForm({
               />
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm text-white/70">
-            <input
-              type="checkbox"
-              name="ctaNewTab"
-              checked={values.ctaNewTab}
-              onChange={(e) => set("ctaNewTab", e.target.checked)}
-            />
-            In neuem Tab öffnen
-          </label>
+        </section>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Zweiter Button (Text)">
-              <input name="cta2Text" value={values.cta2Text} onChange={(e) => set("cta2Text", e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Zweiter Button (URL)" error={state.fieldErrors?.cta2Url}>
-              <input name="cta2Url" value={values.cta2Url} onChange={(e) => set("cta2Url", e.target.value)} className={inputClass} />
-            </Field>
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-sm font-semibold text-white/80">Kategorie</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => set("categoryId", "")}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium ${
+                values.categoryId === "" ? "bg-violet-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+              }`}
+            >
+              Ohne Kategorie
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => set("categoryId", c.id)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-medium ${
+                  values.categoryId === c.id ? "bg-violet-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
           </div>
-          <label className="flex items-center gap-2 text-sm text-white/70">
-            <input
-              type="checkbox"
-              name="cta2NewTab"
-              checked={values.cta2NewTab}
-              onChange={(e) => set("cta2NewTab", e.target.checked)}
-            />
-            Zweiten Button in neuem Tab öffnen
-          </label>
+          <input type="hidden" name="categoryId" value={values.categoryId} />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-sm font-semibold text-white/80">Bild</h2>
+          <ImagePicker
+            imageUrl={values.imageUrl}
+            mediaIconKey={values.mediaIconKey}
+            imageAlt={values.imageAlt}
+            onAltChange={(alt) => set("imageAlt", alt)}
+            onSelect={(media) => {
+              set("imageUrl", media.imageUrl);
+              set("mediaIconKey", media.mediaIconKey);
+            }}
+            mediaAssets={mediaAssets}
+          />
+          <input type="hidden" name="mediaIconKey" value={values.mediaIconKey ?? ""} />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-sm font-semibold text-white/80">Card-Stil</h2>
+          <StylePicker value={values.stylePreset} onChange={(key) => set("stylePreset", key)} />
+          <input type="hidden" name="stylePreset" value={values.stylePreset} />
         </section>
 
         <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -296,8 +262,81 @@ export function CardForm({
               checked={values.featured}
               onChange={(e) => set("featured", e.target.checked)}
             />
-            Als Featured hervorheben
+            Besonders hervorheben
           </label>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="flex w-full items-center justify-between text-left text-sm font-semibold text-white/80"
+          >
+            Weitere Optionen
+            <ChevronDown className={`h-4 w-4 text-white/40 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+          </button>
+          {advancedOpen && (
+            <div className="mt-4 flex flex-col gap-4">
+              <Field label="Badge">
+                <input name="badge" value={values.badge} onChange={(e) => set("badge", e.target.value)} className={inputClass} />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Alter Preis">
+                  <input name="oldPrice" value={values.oldPrice} onChange={(e) => set("oldPrice", e.target.value)} className={inputClass} />
+                </Field>
+                <Field label="Rabatttext">
+                  <input name="discountText" value={values.discountText} onChange={(e) => set("discountText", e.target.value)} className={inputClass} />
+                </Field>
+              </div>
+              <Field label="Ablaufdatum">
+                <input
+                  type="date"
+                  name="expiresAt"
+                  value={values.expiresAt}
+                  onChange={(e) => set("expiresAt", e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Ausführlichere Beschreibung">
+                <textarea
+                  name="longDesc"
+                  rows={3}
+                  value={values.longDesc}
+                  onChange={(e) => set("longDesc", e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Hinweistext (klein, unter dem Angebot)">
+                <input name="hint" value={values.hint} onChange={(e) => set("hint", e.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Stichwörter (durch Komma getrennt)">
+                <input
+                  name="tags"
+                  value={values.tags}
+                  onChange={(e) => set("tags", e.target.value)}
+                  placeholder="z. B. neu, empfehlung"
+                  className={inputClass}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm text-white/70">
+                <input
+                  type="checkbox"
+                  name="ctaNewTab"
+                  checked={values.ctaNewTab}
+                  onChange={(e) => set("ctaNewTab", e.target.checked)}
+                />
+                Button öffnet in neuem Tab
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Zweiter Button (Text)">
+                  <input name="cta2Text" value={values.cta2Text} onChange={(e) => set("cta2Text", e.target.value)} className={inputClass} />
+                </Field>
+                <Field label="Zweiter Button (Ziel)" error={state.fieldErrors?.cta2Url}>
+                  <input name="cta2Url" value={values.cta2Url} onChange={(e) => set("cta2Url", e.target.value)} className={inputClass} />
+                </Field>
+              </div>
+            </div>
+          )}
         </section>
 
         {state.error && <p className="text-sm text-red-400">{state.error}</p>}
@@ -308,7 +347,7 @@ export function CardForm({
             disabled={pending}
             className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-60"
           >
-            {pending ? "Speichern…" : isEdit ? "Änderungen speichern" : "Card erstellen"}
+            {pending ? "Speichern…" : isEdit ? "Änderungen speichern" : "Angebot speichern"}
           </button>
           <button
             type="button"
@@ -316,7 +355,7 @@ export function CardForm({
             className="lg:hidden flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2.5 text-sm text-white/70"
           >
             {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            Vorschau
+            Vorschau anzeigen
           </button>
         </div>
       </form>
