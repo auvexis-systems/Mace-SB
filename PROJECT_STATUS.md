@@ -2,6 +2,14 @@
 
 Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau)
 
+## Stabile Online-Baseline (Tag `mace-v1.3-online-baseline`)
+
+- Render-Deployment funktioniert (Build, `render:init`, Start).
+- Admin-Login funktioniert.
+- Öffentliche Seite funktioniert.
+- 4 Demo-Cards vorhanden.
+- Dieser Tag ist der stabile Rücksetzpunkt vor Admin 2.0.
+
 ## Implementiert
 
 ### Öffentliche Seite
