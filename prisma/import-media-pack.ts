@@ -3,6 +3,17 @@
 // inserts new ones, and skips anything it already imported (matched by the
 // public fileUrl it would create) so re-running the script is always safe.
 //
+// Two source modes, picked automatically:
+//   - "raw pack" — assets/MaceSlotsBonus_AssetPack_v1.0/ exists (the authoring
+//     machine that first ran the import). Files are copied into public/media-pack.
+//   - "already deployed" — that raw folder is intentionally NOT committed to
+//     git (avoids doubling ~37MB of binaries in the repo), so on a fresh
+//     environment like Render only the already-committed public/media-pack
+//     copy exists. In that case the same PNGs are read directly from there
+//     (no copy needed) and only the missing MediaAsset rows are created —
+//     this is exactly the path needed to backfill a production database
+//     after a deploy that only carried the code, not the local dev database.
+//
 // Usage: npm run import:media-pack
 import fs from "node:fs";
 import path from "node:path";
@@ -13,6 +24,7 @@ const prisma = new PrismaClient();
 
 const SOURCE_ROOT = path.join(__dirname, "..", "assets", "MaceSlotsBonus_AssetPack_v1.0");
 const PUBLIC_ROOT = path.join(__dirname, "..", "public", "media-pack");
+const USING_RAW_SOURCE = fs.existsSync(SOURCE_ROOT);
 
 type Meta = { label: string; tags: string[]; category?: MediaCategory };
 
@@ -60,6 +72,15 @@ function listPng(dir: string): string[] {
     .readdirSync(dir)
     .filter((f) => f.toLowerCase().endsWith(".png"))
     .sort();
+}
+
+// Resolves one section's source directory (and the files in it), preferring
+// the raw asset pack when present, otherwise the already-deployed copy under
+// public/media-pack. rawSubdir/publicSubdir describe the same section in each
+// layout, e.g. "01_Backgrounds" vs "backgrounds".
+function collectSection(rawSubdir: string, publicSubdir: string): { filename: string; sourcePath: string }[] {
+  const dir = USING_RAW_SOURCE ? path.join(SOURCE_ROOT, rawSubdir) : path.join(PUBLIC_ROOT, publicSubdir);
+  return listPng(dir).map((filename) => ({ filename, sourcePath: path.join(dir, filename) }));
 }
 
 // Rejects anything that isn't a real PNG (checked by magic bytes), regardless
@@ -128,25 +149,32 @@ function planUi(sourcePath: string, filename: string): PlannedAsset {
 }
 
 async function main() {
-  if (!fs.existsSync(SOURCE_ROOT)) {
-    console.error(`Quellordner nicht gefunden: ${SOURCE_ROOT}`);
-    process.exitCode = 1;
-    return;
-  }
+  console.log(
+    USING_RAW_SOURCE
+      ? `Quelle: Roh-Asset-Pack (${SOURCE_ROOT})`
+      : `Roh-Asset-Pack nicht gefunden — verwende bereits ausgelieferte Kopie unter ${PUBLIC_ROOT}`
+  );
 
   const plans: PlannedAsset[] = [];
 
-  const bgDir = path.join(SOURCE_ROOT, "01_Backgrounds");
-  for (const f of listPng(bgDir)) plans.push(planBackground(path.join(bgDir, f), f));
+  for (const { filename, sourcePath } of collectSection("01_Backgrounds", "backgrounds")) {
+    plans.push(planBackground(sourcePath, filename));
+  }
+  for (const { filename, sourcePath } of collectSection("02_Card_Motifs_Dark", "card-motifs/dark")) {
+    plans.push(planCardMotif(sourcePath, filename, "dark"));
+  }
+  for (const { filename, sourcePath } of collectSection("03_Card_Motifs_Transparent", "card-motifs/transparent")) {
+    plans.push(planCardMotif(sourcePath, filename, "transparent"));
+  }
+  for (const { filename, sourcePath } of collectSection("04_UI_Assets", "ui")) {
+    plans.push(planUi(sourcePath, filename));
+  }
 
-  const darkDir = path.join(SOURCE_ROOT, "02_Card_Motifs_Dark");
-  for (const f of listPng(darkDir)) plans.push(planCardMotif(path.join(darkDir, f), f, "dark"));
-
-  const transDir = path.join(SOURCE_ROOT, "03_Card_Motifs_Transparent");
-  for (const f of listPng(transDir)) plans.push(planCardMotif(path.join(transDir, f), f, "transparent"));
-
-  const uiDir = path.join(SOURCE_ROOT, "04_UI_Assets");
-  for (const f of listPng(uiDir)) plans.push(planUi(path.join(uiDir, f), f));
+  if (plans.length === 0) {
+    console.error("Kein Quellmaterial gefunden — weder das Roh-Asset-Pack noch public/media-pack enthalten PNGs.");
+    process.exitCode = 1;
+    return;
+  }
 
   const invalid = plans.filter((p) => !isValidPng(p.sourcePath));
   if (invalid.length > 0) {
@@ -170,8 +198,17 @@ async function main() {
     }
 
     const destPath = path.join(PUBLIC_ROOT, plan.publicRelPath);
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.copyFileSync(plan.sourcePath, destPath);
+    if (path.resolve(plan.sourcePath) !== path.resolve(destPath)) {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(plan.sourcePath, destPath);
+    } else if (!fs.existsSync(destPath)) {
+      // Deployed-copy mode expects the file to already be there (it's part
+      // of the git-tracked build); if it's missing there's nothing to copy
+      // it from, so skip this one rather than writing a dangling DB row.
+      console.error(`Übersprungen (Datei fehlt): ${destPath}`);
+      skipped++;
+      continue;
+    }
 
     await prisma.mediaAsset.create({
       data: {
