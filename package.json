@@ -14,7 +14,8 @@
     "import:media-pack": "tsx prisma/import-media-pack.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "render:init": "npm run db:push && npm run db:seed"
+    "render:init": "npm run db:push && npm run db:seed && npm run import:media-pack",
+    "render:start": "npm run render:init && npm run start"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

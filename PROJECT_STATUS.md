@@ -1,6 +1,6 @@
 # MaceSlotsBonus — Projektstatus
 
-Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS, Media Pack v1.0 Import)
+Stand: 2026-08-22 (v1.0 Kernversion, v1.1 Visual & Motion Upgrade, v1.2 Referenzbild-Feinabstimmung, v1.3 Visueller Neuaufbau, Admin 2.0 No-Code CMS, Media Pack v1.0 Import, Render-Auto-Init)
 
 ## Stabile Online-Baseline (Tag `mace-v1.3-online-baseline`)
 
@@ -1007,3 +1007,68 @@ die bestehende `MediaAsset`-Tabelle, per neuem Skript
   `assetType`/`tags`, Duplikat-Erkennung über `fileUrl`, bestehende Zeilen
   bleiben beim Einfügen neuer Assets unverändert) — Gesamt **54/54 Tests
   grün**.
+
+---
+
+# Render-Auto-Init — Medienbibliothek ohne Shell-Zugriff aktuell halten
+
+Nachträgliche Korrektur, nachdem sich zeigte, dass **Render Free keinen
+Shell-Tab besitzt** — der ursprünglich dokumentierte manuelle Init-Schritt
+(`npm run render:init` im Shell-Tab) war auf diesem Tarif also gar nicht
+ausführbar, und da Renders Container-Dateisystem bei jedem Redeploy/Neustart
+zurückgesetzt wird, hätte ein einmaliger manueller Schritt ohnehin nach dem
+nächsten Neustart erneut gefehlt.
+
+- **Zwei Bugs behoben, ein Workflow ergänzt:**
+  1. `prisma/import-media-pack.ts` las bisher ausschließlich aus dem nicht
+     committeten Rohordner `assets/MaceSlotsBonus_AssetPack_v1.0/` und wäre
+     auf jeder frischen Umgebung (Render, aber auch ein neuer Checkout)
+     sofort mit „Quellordner nicht gefunden" abgebrochen — obwohl die PNGs
+     über `public/media-pack/` längst Teil des Git-Repos sind. Das Skript
+     erkennt jetzt automatisch, wenn der Rohordner fehlt, und liest
+     stattdessen direkt aus der bereits ausgelieferten Kopie unter
+     `public/media-pack/` (kein Kopiervorgang nötig, nur die fehlenden
+     `MediaAsset`-Zeilen werden angelegt). Verifiziert durch einen lokalen
+     Test mit versteckter `assets/`-Quelle gegen eine leere Scratch-Datenbank
+     — korrekt 30 neu importiert mit identischen Kategorien/Tags/Namen.
+  2. Neues npm-Skript `render:start`
+     (`npm run render:init && npm run start`) sowie `render:init` um den
+     Medien-Import erweitert (`db:push && db:seed && import:media-pack`).
+     Als Render-**Start Command** hinterlegt, läuft der komplette Init damit
+     automatisch bei **jedem** Containerstart — kein Shell-Zugriff und kein
+     separates „Pre-Deploy Command"-Feature mehr nötig.
+- **Idempotenz bei jedem Boot:** Alle drei verketteten Schritte sind bereits
+  einzeln idempotent (Schema-Push additiv, Seed prüft Existenz je Datensatz,
+  Medien-Import prüft Existenz je `fileUrl`) — mehrfaches Starten/Neustarten
+  auf Render dupliziert nichts und ändert keine bestehende Zeile. Lokal
+  erneut bestätigt: `render:init` gegen die bereits vollständig befüllte
+  `dev.db` ausgeführt → Admin-Nutzer übersprungen, 0 neu importierte
+  Medien-Zeilen (30 bereits vorhanden).
+- **End-to-End lokal geprüft:** `npm run render:start` komplett durchlaufen
+  lassen (Schema-Sync → Seed → Medien-Import → Serverstart) und den
+  laufenden Server per HTTP-Aufruf bestätigt (Status 200) — exakt die
+  Befehlskette, die Render beim Hochfahren des Free-Containers ausführen
+  wird.
+- **`RENDER_DEPLOY.md` aktualisiert:** Start Command auf `npm run
+  render:start` geändert, Abschnitt 4 komplett neu formuliert (automatischer
+  statt manueller Init), Hinweis ergänzt, dass ein bereits laufender Service
+  einmalig im Dashboard unter „Settings → Start Command" umgestellt werden
+  muss (normale Dashboard-Einstellung, kein Shell-Befehl), sowie die
+  veraltete Referenz auf einen Shell-Zugriff zum Auslesen von
+  `ADMIN_CREDENTIALS.txt` entfernt (auf Free-Tier ohnehin nicht einsehbar —
+  `ADMIN_*`-Environment-Variablen sind auf diesem Tarif praktisch
+  erforderlich, nicht nur empfohlen).
+- **Kein Zugriff auf die eigentliche Render-Produktionsumgebung:** Es steht
+  in dieser Sitzung kein Render-API-Key, keine Render-CLI und kein
+  SSH-/Shell-Zugriff zur Verfügung — die drei vom Auftraggeber angeforderten
+  Prüfpunkte (PNGs auf Render vorhanden? aktuelle `MediaAsset`-Anzahl in
+  Produktion? Import dort tatsächlich ausgeführt?) konnten deshalb nicht
+  direkt verifiziert werden. Stattdessen wurde die Ursache lokal
+  reproduziert, behoben und der komplette Automatik-Workflow lokal
+  Ende-zu-Ende getestet; die tatsächliche Bestätigung auf der
+  Produktionsinstanz erfolgt nach dem nächsten Redeploy durch den
+  Auftraggeber selbst (Aufruf von `/admin/media`).
+- **Qualitäts-Gate:** `lint` ✓, `typecheck` ✓, `test` ✓ **54/54**, `build` ✓
+  — keine neue Testlogik nötig (reine Skript-/Konfigurationsänderung ohne
+  neue Verzweigungen in der Anwendung selbst); stattdessen End-to-End per
+  echtem Kommando-Lauf verifiziert (siehe oben).
